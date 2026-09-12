@@ -9,30 +9,30 @@
   "bugs": "https://github.com/HichemTab-tech/xcute/issues",
   "dependencies": {
     "@inquirer/prompts": "^8.3.2",
-    "@oclif/core": "^4.10.3",
-    "@oclif/plugin-help": "^6.2.41",
-    "@oclif/plugin-plugins": "^5.4.59",
-    "chalk": "^5.6.2",
+    "@oclif/core": "^5.0.0",
+    "@oclif/plugin-help": "^7.0.0",
+    "@oclif/plugin-plugins": "^6.0.1",
+    "chalk": "^6.0.0",
     "cli-table3": "^0.6.5",
-    "execa": "^9.6.1",
+    "execa": "^10.0.1",
     "strip-ansi": "^7.2.0"
   },
   "devDependencies": {
     "@eslint/compat": "^2.0.3",
     "@oclif/prettier-config": "^0.2.1",
-    "@oclif/test": "^4.1.17",
+    "@oclif/test": "^5.0.0",
     "@types/chai": "^5.2.3",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^25.5.0",
+    "@types/node": "^26.5.0",
     "chai": "^6.2.2",
     "eslint": "^10.1.0",
-    "eslint-config-oclif": "^6.0.154",
+    "eslint-config-oclif": "^7.1.7",
     "eslint-config-prettier": "^10.1.8",
-    "mocha": "^11.7.5",
-    "oclif": "^4.22.96",
+    "mocha": "^12.0.0",
+    "oclif": "^5.0.1",
     "shx": "^0.4.0",
     "ts-node": "^10.9.2",
-    "typescript": "^6.0.2"
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=21.0.0"
