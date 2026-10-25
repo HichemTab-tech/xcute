@@ -80,6 +80,14 @@ pnpm install
 git commit -m "feat: add filter option to select command"
 ```
 
+6. If your change affects users of the CLI, add a changeset:
+
+    ```bash
+    pnpm changeset
+    ```
+
+    Pick the bump type (`patch`, `minor` or `major`), write one line for the changelog, and commit the generated file in `.changeset/`. Internal changes (tests, CI, refactors) don't need one.
+
 ## Submitting a pull request
 
 1. Push your branch:
@@ -94,6 +102,12 @@ git commit -m "feat: add filter option to select command"
     * What you changed
     * Why it’s useful
     * Any related issue (`Closes #123` if applicable)
+
+## Releases (maintainers)
+
+1. When changesets land on `master`, the **Version Packages** workflow opens or updates a `chore: version packages` pull request. It bumps the version in `package.json` and updates `CHANGELOG.md`.
+2. Merge that pull request when you want to release.
+3. Publish a GitHub release for the new version (for example `v0.12.0`). The **Publish** workflow then publishes the package to npm.
 
 ## Notes
 
