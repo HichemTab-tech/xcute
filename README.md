@@ -265,7 +265,10 @@ List all registered actions.
 xcute list
 xcute list -c        # show commands
 xcute list --no-table
+xcute list -f "preview fail"   # match words in names and descriptions
 ```
+
+Inside a repository with an `xcute.yml`, entries are grouped by topic, then `Other`, then `Your actions`. Guides are marked `(guide, N steps)` and show `N steps` in the commands column with `-c`, and a catalog entry hidden by one of your actions is marked `(your action wins)`.
 
 ### `xcute select`
 
