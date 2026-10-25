@@ -183,6 +183,11 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
     const readEntry = (name: string, keyNode: unknown, node: unknown, topicIds: Set<string>): CatalogEntry | undefined => {
         const where = `entry "${name}": `
         const before = errors.length
+        if (name === '__proto__') {
+            fail(keyNode, `${where}this name is reserved`)
+            return undefined
+        }
+
         const fields = readKeys(node, ENTRY_KEYS, where)
         if (!fields) return undefined
 

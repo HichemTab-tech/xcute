@@ -6,7 +6,7 @@ export interface VariableDefinition {
     replacements: string[]
 }
 
-function parseVariableToken(text: string): { defaultValue?: string; description: string; hasDefaultValue: boolean; name: string } {
+export function parseVariableToken(text: string): { defaultValue?: string; description: string; hasDefaultValue: boolean; name: string } {
     const [metadata, ...defaultParts] = text.split('|')
     const hasDefaultValue = defaultParts.length > 0
     const defaultValue = hasDefaultValue ? defaultParts.join('|').trim() : undefined
