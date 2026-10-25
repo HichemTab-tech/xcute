@@ -103,6 +103,13 @@ describe('run', () => {
         expect(fs.existsSync(outputPath)).to.equal(false)
     })
 
+    it('reports an Object.prototype name as not found instead of crashing', async () => {
+        fs.writeFileSync(path.join(testDir, 'config.json'), JSON.stringify({real: {commands: ['echo real']}}))
+
+        const {error} = await runCommand(['run', 'constructor'])
+        expect(error?.message).to.contain('Action "constructor" not found')
+    })
+
     describe('project catalogs', () => {
         let cleanup: (() => void) | undefined
         let originalInteractive: typeof terminal.isInteractive
@@ -207,6 +214,34 @@ ${extra}`
             const {stdout} = await runCommand(['run', 'make-file', '--dry-run'])
             expect(stdout).to.contain('$ node -e')
             expect(fs.existsSync(path.join(dir, 'ran.txt'))).to.equal(false)
+        })
+
+        it('refuses an untrusted catalog through the shortcut hook without a TTY', async () => {
+            const {dir} = repo(catalogSource(), false)
+
+            const result = await runHook(['make-file'], 'make-file')
+            expect(result.code).to.equal(1)
+            expect(result.stdout).to.contain('xcute trust')
+            expect(fs.existsSync(path.join(dir, 'ran.txt'))).to.equal(false)
+        })
+
+        it('runs a personal action from a catalog subfolder in that subfolder', async () => {
+            const {dir} = repo(catalogSource())
+            fs.writeFileSync(path.join(testDir, 'config.json'), JSON.stringify({
+                'mark-here': {commands: [touch('personal.txt')]},
+                'mark-shortcut': {commands: [touch('shortcut.txt')]},
+            }))
+            const sub = path.join(dir, 'packages', 'foo')
+            fs.mkdirSync(sub, {recursive: true})
+            process.chdir(sub)
+
+            await runCommand(['run', 'mark-here'])
+            expect((await runHook(['mark-shortcut'], 'mark-shortcut')).code).to.equal(0)
+
+            expect(fs.existsSync(path.join(sub, 'personal.txt'))).to.equal(true)
+            expect(fs.existsSync(path.join(sub, 'shortcut.txt'))).to.equal(true)
+            expect(fs.existsSync(path.join(dir, 'personal.txt'))).to.equal(false)
+            expect(fs.existsSync(path.join(dir, 'shortcut.txt'))).to.equal(false)
         })
 
         it('runs a colon-named entry through the shortcut hook', async () => {
@@ -328,6 +363,37 @@ entries:
                 expect(result.stderr).to.contain('--from must be a step number between 1 and 4')
             })
 
+            it('reports an out-of-range --from before the trust check of an untrusted guide', async () => {
+                const {dir} = repo(guideSource, false)
+
+                const {error, stderr, stdout} = await runCommand(['run', 'rehearsal', '--from', '99'])
+                expect(error?.oclif?.exit).to.equal(1)
+                expect(stderr).to.contain('--from must be a step number between 1 and 4')
+                expect(stdout).to.not.contain('xcute trust')
+                expect(selectCalls).to.equal(0)
+                expect(fs.existsSync(path.join(dir, 'm4.txt'))).to.equal(false)
+            })
+
+            it('does not offer trust when --from is invalid, even in a terminal', async () => {
+                repo(guideSource, false)
+                terminal.isInteractive = () => true
+
+                const result = await runHook(['rehearsal', '--from', 'abc'], 'rehearsal')
+                expect(result.code).to.equal(1)
+                expect(result.stderr).to.contain('--from must be a step number between 1 and 4')
+                expect(result.stdout).to.not.contain('has not been trusted')
+                expect(selectCalls).to.equal(0)
+            })
+
+            it('rejects --from for a personal action', async () => {
+                fs.writeFileSync(path.join(testDir, 'config.json'), JSON.stringify({mine: {commands: ['echo mine']}}))
+
+                const result = await runHook(['mine', '--from', '2'], 'mine')
+                expect(result.code).to.equal(1)
+                expect(result.stderr).to.contain('--from only works with guides')
+                expect(result.stdout).to.not.contain('$ echo mine')
+            })
+
             it('rejects --from for an entry that is not a guide', async () => {
                 repo(catalogSource())
 
@@ -335,6 +401,18 @@ entries:
                 expect(result.code).to.equal(1)
                 expect(result.stderr).to.contain('--from only works with guides')
             })
+        })
+
+        it('runs a catalog entry named like an Object.prototype member', async () => {
+            repo(`entries:
+  constructor:
+    description: Build it.
+    commands: [echo built]
+`)
+
+            const {error, stdout} = await runCommand(['run', 'constructor', '--dry-run'])
+            expect(error).to.equal(undefined)
+            expect(stdout).to.contain('$ echo built')
         })
 
         it('prints catalog errors when the name is not found and xcute.yml is invalid', async () => {

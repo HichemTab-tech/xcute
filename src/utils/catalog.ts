@@ -35,8 +35,9 @@ export function findCatalogFile(startDir: string): string | undefined {
 export function loadCatalog(startDir: string = process.cwd()): LoadedCatalog | undefined {
     const found = findCatalogFile(startDir)
     if (!found) return undefined
+    // Commands run where xcute.yml was found; trust is keyed by the real file, even when xcute.yml is a symlink.
+    const dir = path.dirname(found)
     const file = realpath(found)
-    const dir = path.dirname(file)
     let source: string
     try {
         source = fs.readFileSync(file, 'utf8')

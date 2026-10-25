@@ -41,6 +41,17 @@ describe('config utilities', () => {
         expect(actionExists('my-tpl')).to.equal(false)
     })
 
+    it('does not treat Object.prototype names as actions', () => {
+        setAction('real', {commands: ['echo a']})
+        for (const name of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) {
+            expect(getAction(name), name).to.equal(undefined)
+            expect(actionExists(name), name).to.equal(false)
+            expect(deleteAction(name), name).to.equal(false)
+        }
+
+        expect(getAction('real')).to.deep.equal({commands: ['echo a']})
+    })
+
     it('returns filtered actions with getAllActions', () => {
         setAction('selected', {commands: ['echo a']})
         setAction('other', {commands: ['echo b']})

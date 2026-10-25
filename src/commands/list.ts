@@ -83,7 +83,7 @@ class List extends BaseCommand {
         ].filter((block) => block.rows.length > 0)
 
         if (blocks.length === 0) {
-            this.log('No actions registered')
+            this.log(flags.filter === undefined ? 'No actions registered' : `No actions match "${flags.filter}"`)
             return
         }
 

@@ -3,21 +3,11 @@ import type {ResolvedEntry} from './resolver.js'
 
 import {prompts} from './prompts.js'
 import {executeCommands, resolveVariable} from './runner.js'
-import {entryVariables} from './trust.js'
+import {entryVariables, stepTexts} from './trust.js'
 import {extractVariables, parseVariableToken, VARIABLE_PATTERN, type VariableDefinition} from './variables.js'
 
 export function guideVariables(entry: GuideEntry): Map<string, VariableDefinition> {
     return entryVariables(entry)
-}
-
-function stepTexts(step: GuideStep): string[] {
-    const texts = [step.title]
-    if (step.text !== undefined) texts.push(step.text)
-    if (step.warn !== undefined) texts.push(step.warn)
-    if (step.run) texts.push(...step.run)
-    if (step.manual !== undefined) texts.push(step.manual)
-    if (step.check !== undefined) texts.push(step.check)
-    return texts
 }
 
 export function stepVariables(step: GuideStep): string[] {
@@ -59,7 +49,7 @@ export function renderEntry(resolved: ResolvedEntry, providedValues: string[]): 
     }
 
     const {catalog, entry, name} = resolved
-    const variables = entry.kind === 'guide' ? guideVariables(entry) : entryVariables(entry)
+    const variables = entryVariables(entry)
     const values = mapValues(variables, providedValues)
     const fill = (text: string) => fillPlaceholders(text, variables, values)
 
@@ -83,8 +73,15 @@ export function renderEntry(resolved: ResolvedEntry, providedValues: string[]): 
         if (step.check !== undefined) lines.push(`   ${fill(step.check)}`)
     }
 
-    lines.push('', `Closed the terminal partway? Pick up again: xcute ${name} [values] --from <n>`)
+    lines.push('', resumeTemplate(name, variables.size, providedValues))
     return lines
+}
+
+function resumeTemplate(name: string, variableCount: number, providedValues: string[]): string {
+    const passed = providedValues.slice(0, variableCount).map((value) => shellQuote(value))
+    // With nothing passed, `[values]` shows where they go; a guide without variables takes none.
+    const values = passed.length === 0 && variableCount > 0 ? ['[values]'] : passed
+    return `Closed the terminal partway? Pick up again: xcute ${[name, ...values].join(' ')} --from <n>`
 }
 
 function mapValues(variables: Map<string, VariableDefinition>, provided: string[]): Record<string, string> {
@@ -94,6 +91,11 @@ function mapValues(variables: Map<string, VariableDefinition>, provided: string[
     }
 
     return values
+}
+
+// The error for a --from that is not a step of a guide with `total` steps, or undefined when it is one.
+export function checkFromStep(from: number, total: number): string | undefined {
+    return Number.isInteger(from) && from >= 1 && from <= total ? undefined : `--from must be a step number between 1 and ${total}`
 }
 
 export interface WalkOptions {
@@ -149,7 +151,6 @@ async function runStep(
     if (answer === 'skip') return undefined
 
     while (!(await executeCommands(commands, {cwd, logError}))) {
-         
         const next = await choose('The command failed. What now?', [['retry', 'Retry'], ['skip', 'Skip'], ['stop', 'Stop']])
         if (next === 'stop') return 1
         if (next === 'skip') break
@@ -162,8 +163,9 @@ export async function walkGuide(entry: GuideEntry, options: WalkOptions): Promis
     const {catalogName, cwd, dryRun = false, from = 1, interactive = false, log, logError, name, providedValues, topicTitle} = options
     const total = entry.steps.length
 
-    if (!Number.isInteger(from) || from < 1 || from > total) {
-        logError(`--from must be a step number between 1 and ${total}`)
+    const fromError = checkFromStep(from, total)
+    if (fromError) {
+        logError(fromError)
         return 1
     }
 
@@ -172,17 +174,20 @@ export async function walkGuide(entry: GuideEntry, options: WalkOptions): Promis
     const values: Record<string, string> = {}
     const fill = (text: string) => fillPlaceholders(text, variables, values)
 
+    // Values in positional order up to the first unknown one; a value passed on the command line counts even
+    // when no step has used it yet.
     const knownValues = (): string[] => {
         const known: string[] = []
-        for (const variableName of variableNames) {
-            if (values[variableName] === undefined) break
-            known.push(values[variableName])
+        for (const [index, variableName] of variableNames.entries()) {
+            const value = values[variableName] ?? providedValues[index]
+            if (value === undefined) break
+            known.push(value)
         }
 
         return known
     }
 
-    log(entry.name === name ? name : `${name} (${entry.name})`)
+    log(name)
     log(entry.description)
     const origin = [catalogName, topicTitle].filter(Boolean).join(' · ')
     if (origin) log(origin)
@@ -200,7 +205,6 @@ export async function walkGuide(entry: GuideEntry, options: WalkOptions): Promis
 
             for (const variableName of stepVariables(step)) {
                 if (values[variableName] !== undefined) continue
-                 
                 values[variableName] = await resolveVariable(
                     variableName,
                     variables.get(variableName)!,
@@ -214,7 +218,6 @@ export async function walkGuide(entry: GuideEntry, options: WalkOptions): Promis
             if (step.text !== undefined) log(fill(step.text))
             if (step.warn !== undefined) log(`⚠ ${fill(step.warn)}`)
 
-             
             const stopCode = await runStep(step, fill, {cwd, dryRun, log, logError})
             if (stopCode !== undefined) return stop(stopCode)
         }

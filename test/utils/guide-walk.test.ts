@@ -113,6 +113,18 @@ describe('walkGuide', () => {
         expect(selectChoices[0]).to.deep.equal(['Run', 'Skip', 'Stop'])
     })
 
+    it('keeps passed values for steps not reached yet in the stop hint', async () => {
+        selectAnswers = ['run', 'stop']
+        expect(await walkGuide(guide(), opts({providedValues: ['t', '0', 'z']}))).to.equal(0)
+        expect(out.at(-1)).to.equal('Stopped at step 2. Pick up with: xcute rehearsal t 0 z --from 2')
+    })
+
+    it('keeps passed values for steps skipped by --from in the stop hint', async () => {
+        selectAnswers = ['stop']
+        expect(await walkGuide(guide(), opts({from: 4, providedValues: ['table', '0', 'abc']}))).to.equal(0)
+        expect(out.at(-1)).to.equal('Stopped at step 4. Pick up with: xcute rehearsal table 0 abc --from 4')
+    })
+
     it('waits at manual and check steps', async () => {
         selectAnswers = ['skip', 'skip', 'continue', 'skip', 'continue']
         const code = await walkGuide(guide(), opts({providedValues: ['t', '0', 'z']}))

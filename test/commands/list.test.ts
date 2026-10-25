@@ -63,6 +63,12 @@ describe('list', () => {
         expect(stdout).to.not.contain('vue-app')
     })
 
+    it('keeps saying No actions registered outside a catalog when -f matches nothing', async () => {
+        fs.writeFileSync(path.join(testDir, 'config.json'), JSON.stringify({'react-app': {commands: ['echo react']}}))
+        const {stdout} = await runCommand(['list', '-f', 'zzz'])
+        expect(stdout.trim()).to.equal('No actions registered')
+    })
+
     describe('inside a catalog', () => {
         const source = `version: 1
 name: Demo
@@ -134,11 +140,26 @@ entries:
             expect(stdout).to.contain('rehearsal (your action wins)')
         })
 
+        it('does not mark an entry named like an Object.prototype member as shadowed', async () => {
+            writePersonal({mine: {commands: ['echo mine']}})
+            repo = createCatalogRepo('entries:\n  constructor:\n    description: Build it.\n    commands: [echo built]\n')
+            const {stdout} = await runCommand(['list'])
+            expect(stdout).to.contain('constructor')
+            expect(stdout).to.not.contain('your action wins')
+        })
+
         it('filters by description words with -f', async () => {
             repo = createCatalogRepo(source)
             const {stdout} = await runCommand(['list', '-f', '"preview fail"'])
             expect(stdout).to.contain('rerun-site-previews')
             expect(stdout).to.not.contain('rehearsal')
+        })
+
+        it('says nothing matches when -f finds no entry or action', async () => {
+            writePersonal({mine: {commands: ['echo mine'], description: 'Personal'}})
+            repo = createCatalogRepo(source)
+            const {stdout} = await runCommand(['list', '-f', 'zzz'])
+            expect(stdout.trim()).to.equal('No actions match "zzz"')
         })
 
         it('prints catalog errors and still lists personal actions', async () => {

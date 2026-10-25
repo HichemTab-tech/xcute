@@ -87,9 +87,10 @@ export function saveConfig(config: ConfigData): void {
     fs.writeFileSync(getConfigFile(), JSON.stringify(config, null, 2), 'utf8')
 }
 
+// Lookups use own properties only, so names like `constructor` or `toString` are not taken from Object.prototype.
 export function getAction(name: string): Action | undefined {
     const config = loadConfig()
-    return config[name]
+    return Object.hasOwn(config, name) ? config[name] : undefined
 }
 
 export function setAction(name: string, action: Action): void {
@@ -100,7 +101,7 @@ export function setAction(name: string, action: Action): void {
 
 export function deleteAction(name: string): boolean {
     const config = loadConfig()
-    if (config[name]) {
+    if (Object.hasOwn(config, name)) {
         delete config[name]
         saveConfig(config)
         return true
@@ -111,7 +112,7 @@ export function deleteAction(name: string): boolean {
 
 export function actionExists(name: string): boolean {
     const config = loadConfig()
-    return name in config
+    return Object.hasOwn(config, name)
 }
 
 export function getAllActions(filter?: string): ConfigData {

@@ -6,7 +6,7 @@ import * as path from 'node:path'
 import {loadCatalog} from '../../src/utils/catalog.js'
 import {setConfigDir} from '../../src/utils/config.js'
 import {prompts, terminal} from '../../src/utils/prompts.js'
-import {readTrust, runnableParts, writeTrust} from '../../src/utils/trust.js'
+import {getTrustFile, readTrust, runnableParts, writeTrust} from '../../src/utils/trust.js'
 import {ensureTrusted, formatTrustChanges} from '../../src/utils/trust-gate.js'
 import {createCatalogRepo} from '../helpers/catalog-repo.js'
 
@@ -128,6 +128,16 @@ describe('trust gate', () => {
         process.chdir(link)
         expect(await ensureTrusted(loadCatalog()!, log)).to.equal(true)
         expect(asked).to.equal(0)
+    })
+
+    it('asks as for a first trust when the stored record is malformed', async () => {
+        const loaded = repo(source('pnpm prepare'))
+        fs.writeFileSync(getTrustFile(), JSON.stringify({[loaded.file]: {runnable: {lint: {kind: 'commands'}}, trustedAt: 'x'}}))
+        answers = ['trust']
+
+        expect(await ensureTrusted(loaded, log)).to.equal(true)
+        expect(logs[0]).to.contain('This catalog has not been trusted')
+        expect(readTrust(loaded.file)).to.deep.equal(runnableParts(loaded.catalog!))
     })
 
     it('renders a visible line when only the entry type changed', () => {

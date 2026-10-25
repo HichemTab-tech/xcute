@@ -91,6 +91,21 @@ describe('guide text', () => {
             expect(text).to.contain('Pick up again: xcute rehearsal [values] --from <n>')
         })
 
+        it('fills the resume line with the values passed to show', () => {
+            const {entry, loaded} = load()
+            const resume = (values: string[]) => renderEntry({catalog: loaded, entry, name: 'rehearsal', source: 'project'}, values).at(-1)
+            expect(resume(['table', '0'])).to.equal('Closed the terminal partway? Pick up again: xcute rehearsal table 0 --from <n>')
+            expect(resume(['a b', '0', 'abc', 'extra'])).to.equal("Closed the terminal partway? Pick up again: xcute rehearsal 'a b' 0 abc --from <n>")
+            expect(resume([])).to.equal('Closed the terminal partway? Pick up again: xcute rehearsal [values] --from <n>')
+        })
+
+        it('leaves out [values] for a guide without variables', () => {
+            const {catalog} = parseCatalog('entries:\n  walk:\n    description: d\n    steps:\n      - title: t\n        run: echo hi\n')
+            const loaded: LoadedCatalog = {catalog, dir: '/tmp/x', errors: [], file: '/tmp/x/xcute.yml', name: 'x'}
+            const lines = renderEntry({catalog: loaded, entry: catalog!.entries[0], name: 'walk', source: 'project'}, [])
+            expect(lines.at(-1)).to.equal('Closed the terminal partway? Pick up again: xcute walk --from <n>')
+        })
+
         it('maps positional values onto the variables', () => {
             const {entry, loaded} = load()
             const text = renderEntry({catalog: loaded, entry, name: 'rehearsal', source: 'project'}, ['grid', '2', 'abc123']).join('\n')

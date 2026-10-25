@@ -83,8 +83,13 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
     }
 
     if (doc.errors.length > 0) {
+        const sourceLines = source.split('\n')
         for (const err of doc.errors) {
-            errors.push({line: lineCounter.linePos(err.pos[0]).line, message: err.message.split('\n')[0]})
+            const {line} = lineCounter.linePos(err.pos[0])
+            const message = err.message.split('\n')[0]
+            // `- {{x}} more` and `key: {{x}} more` start a flow mapping, then fail on the text after it.
+            const unquotedToken = /(?:^\s*-|:)\s+\{\{/.test(sourceLines[line - 1] ?? '')
+            errors.push({line, message: unquotedToken ? `${message.replace(/:$/, '')}; ${QUOTE_HINT}` : message})
         }
 
         return {errors}
@@ -107,7 +112,7 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
     // Walks a mapping's pairs, rejecting unknown keys; returns the value node by key name.
     const readKeys = (node: unknown, allowed: string[], where: string): Map<string, {key: unknown; value: unknown}> | undefined => {
         if (!isMap(node)) {
-            fail(node, `${where.replace(/: $/, '')} must be a mapping`)
+            fail(node, `${where.replace(/: $/, '') || 'catalog'} must be a mapping`)
             return undefined
         }
 
