@@ -243,6 +243,9 @@ xcute run react my-app
 
 # Force interactive mode
 xcute run react -i
+
+# Only look in the project catalog (skip your personal actions)
+xcute run --project lint
 ```
 
 ### `xcute <name> [values...]`
@@ -386,6 +389,65 @@ xcute self-update npm
 # Update using yarn
 xcute self-update yarn
 ```
+
+## Project catalogs
+
+A project can ship its own commands in an `xcute.yml` file at the root of the repository, so everyone who clones it runs the same things by the same names.
+
+### Where xcute looks
+
+xcute starts in the current directory and walks up, using the first `xcute.yml` it finds. It stops after the repository root (the first directory containing `.git`), so a catalog above the repository never applies. Outside a Git repository only the current directory is checked.
+
+### Example
+
+```yaml
+version: 1
+name: My App
+entries:
+  lint:
+    description: Lint everything.
+    commands:
+      - pnpm lint
+  preview:
+    description: Re-run a preview workflow.
+    commands:
+      - gh workflow run previews.yml -f pr_number={{pr::Pull request number}}
+  greet:
+    description: Say hello.
+    commands:
+      - "{{greeting|hello}} world"   # quote values that start with {{
+```
+
+Values that start with `{{` must be quoted, otherwise YAML reads them as a mapping. Variables work as in personal actions.
+
+### Running entries
+
+```bash
+xcute lint
+xcute run lint
+xcute run --project lint
+```
+
+Catalog commands always run from the directory that contains `xcute.yml`, wherever you invoked xcute. Personal actions keep running from your current directory.
+
+### Name clashes
+
+Personal actions win. If you have a personal action called `lint` and the catalog has one too, `xcute lint` runs yours. Use `xcute run --project lint` to run the catalog entry. `xcute remove` only touches personal actions and tells you to edit `xcute.yml` for catalog entries.
+
+### Trust
+
+A cloned repository is code someone else wrote, so xcute asks before running anything from a catalog.
+
+- The first time, you see how many entries and commands it has and can choose `Show all commands`, `Trust` or `Cancel`.
+- Trust covers what runs: each entry's type and commands. Changing descriptions, topics or other text never asks again. Changing a command asks again, showing only the difference.
+- Trust covers the whole file. A changed command in any entry asks before running any entry.
+- Without a terminal, xcute refuses and exits with code 1. Run `xcute trust` in the repository to trust the current catalog without a prompt.
+- `xcute trust --revoke` removes the trust record.
+- Listing, `--dry-run` and other read-only views never ask.
+
+Trust does not cover what your commands call. A trusted `pnpm test` runs whatever the `test` script in `package.json` says, and that file is not checked.
+
+Catalogs are committed to the repository, so never put secrets in them. Use variables and let each person supply the value.
 
 ## Examples
 

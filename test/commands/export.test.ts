@@ -5,6 +5,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 
 import {saveConfig, setConfigDir} from '../../src/utils/config.js'
+import {createCatalogRepo} from '../helpers/catalog-repo.js'
 
 describe('export', () => {
   let testDir: string
@@ -49,5 +50,17 @@ describe('export', () => {
     
     const content = JSON.parse(fs.readFileSync(expectedFile, 'utf8'))
     expect(content['test-action']).to.exist
+  })
+
+  it('never exports catalog entries', async () => {
+    const repo = createCatalogRepo('version: 1\nentries:\n  lint:\n    description: Lint.\n    commands:\n      - pnpm lint\n')
+    try {
+      const outputFile = path.join(outputDir, 'in-repo.json')
+      await runCommand(['export', outputFile])
+      const content = JSON.parse(fs.readFileSync(outputFile, 'utf8'))
+      expect(Object.keys(content)).to.deep.equal(['test-action'])
+    } finally {
+      repo.cleanup()
+    }
   })
 })

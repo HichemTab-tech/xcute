@@ -1,9 +1,11 @@
 import {Args, Flags} from '@oclif/core'
 
 import {BaseCommand} from "../BaseCommand.js";
+import {loadCatalog} from '../utils/catalog.js'
 import {actionExists, deleteAction} from '../utils/config.js'
 import {buildChoices} from "../utils/dry.js";
 import {prompts} from "../utils/prompts.js";
+import {resolveEntry} from '../utils/resolver.js'
 
 class Remove extends BaseCommand {
     static args = {
@@ -44,6 +46,11 @@ class Remove extends BaseCommand {
 
         // Check if action exists
         if (!actionExists(actionName)) {
+            const loaded = loadCatalog()
+            if (loaded && resolveEntry(actionName, loaded, true)) {
+                this.error(`"${actionName}" comes from ${loaded.file}. Edit that file to remove it.`)
+            }
+
             this.error(`Action "${actionName}" not found`)
         }
 
