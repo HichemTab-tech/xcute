@@ -4,7 +4,7 @@ import * as path from 'node:path'
 import type {Catalog, CatalogEntry} from './catalog-schema.js'
 
 import {getConfigDir} from './config.js'
-import {extractVariables, parseVariableToken, type VariableDefinition} from './variables.js'
+import {extractVariables, parseVariableToken, VARIABLE_PATTERN, type VariableDefinition} from './variables.js'
 
 export interface RunnableEntry {
     commands: string[][]
@@ -44,7 +44,7 @@ export function entryVariables(entry: CatalogEntry): Map<string, VariableDefinit
 }
 
 export function canonicalCommand(command: string, variables: Map<string, VariableDefinition>): string {
-    return command.replaceAll(/\{\{([\S\s]*?)}}/g, (token, text: string) => {
+    return command.replaceAll(VARIABLE_PATTERN, (token, text: string) => {
         const {name} = parseVariableToken(text)
         if (!name) return token
 
