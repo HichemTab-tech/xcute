@@ -244,16 +244,26 @@ xcute run react my-app
 # Force interactive mode
 xcute run react -i
 
+# Print the resolved commands without running them
+xcute run react my-app --dry-run
+
 # Only look in the project catalog (skip your personal actions)
 xcute run --project lint
+
+# Start a guide at step 3
+xcute run release core 1.2.0 --from 3
 ```
 
 ### `xcute <name> [values...]`
 
-Shortcut for `xcute run`.
+Shortcut for `xcute run`. It takes the same flags, anywhere after the name; everything else is a value.
 
 ```bash
 xcute react my-app
+xcute react -i                      # -i, --interactive: ask for every value
+xcute react my-app -d               # -d, --dry-run: print the commands, run nothing
+xcute lint --project                # --project: skip your own actions, use the project catalog
+xcute release core 1.2.0 --from 3   # --from <n>: start a guide at step n
 ```
 
 ### `xcute list`
@@ -268,11 +278,11 @@ xcute list --no-table
 xcute list -f "preview fail"   # match words in names and descriptions
 ```
 
-Inside a repository with an `xcute.yml`, `xcute select` opens with a header, then the catalog's topics, then `Your actions`. Pick a topic to see its entries (with a way back), or just type to search every entry and your own actions at once. Choosing a guide asks `Walk through it` or `Just read it`. In `xcute list`, entries are grouped by topic, then `Other`, then `Your actions`. Guides are marked `(guide, N steps)` and show `N steps` in the commands column with `-c`, and a catalog entry hidden by one of your actions is marked `(your action wins)`.
+Inside a repository with an `xcute.yml`, catalog entries are grouped by topic, then `Other` (entries without a topic), then `Your actions`. Guides are marked `(guide, N steps)` and show `N steps` in the commands column with `-c`, and a catalog entry hidden by one of your actions is marked `(your action wins)`.
 
 ### `xcute select`
 
-Search, select and run an action. Type to filter by name or description. Inside a repository with an `xcute.yml`, topics come first and guides ask `Walk through it` / `Just read it`.
+Search, select and run an action. Type to filter by name or description.
 
 ```bash
 xcute select
@@ -281,9 +291,11 @@ xcute s react           # same via alias
 xcute select -f react   # legacy filter flag
 ```
 
-### `xcute show <name>`, `xcute trust` and `xcute check`
+Inside a repository with an `xcute.yml`, the picker opens with a header (`<name> · N entries in M topics · K of your actions`), then the catalog's topics with their summaries, then `Your actions`. Pick a topic to see its entries (with a way back), or just type to search every entry and your own actions at once; results are labelled `Topic › name`. Choosing a guide asks `Walk through it` or `Just read it`.
 
-`show`, `trust` and `check` work on the project catalog (see [Project catalogs](#project-catalogs)). They are built-in command names, so an action called `show`, `trust` or `check` can only be run with `xcute run <name>`.
+### `xcute show <name> [values...]`, `xcute trust` and `xcute check`
+
+`show` prints an action or catalog entry without running it or asking anything. `trust` and `check` work on the project catalog (see [Project catalogs](#project-catalogs)). They are built-in command names, so an action called `show`, `trust` or `check` can only be run with `xcute run <name>`.
 
 ### `xcute remove <name>`
 
@@ -410,22 +422,60 @@ xcute starts in the current directory and walks up, using the first `xcute.yml` 
 ```yaml
 version: 1
 name: My App
+topics:
+  checks:
+    title: Checks
+    summary: lint and test
 entries:
   lint:
+    topic: checks
     description: Lint everything.
     commands:
       - pnpm lint
+  test:
+    topic: checks
+    description: Run the tests with the package manager of your choice.
+    commands:
+      - "{{pm::Package manager|pnpm}} test"   # quote values that start with {{
   preview:
-    description: Re-run a preview workflow.
+    description: A preview workflow failed and needs a fresh run.
+    docs: CONTRIBUTING.md#previews
     commands:
       - gh workflow run previews.yml -f pr_number={{pr::Pull request number}}
-  greet:
-    description: Say hello.
-    commands:
-      - "{{greeting|hello}} world"   # quote values that start with {{
 ```
 
-Values that start with `{{` must be quoted, otherwise YAML reads them as a mapping. Variables work as in personal actions.
+Variables work as in personal actions. Values that start with `{{` must be quoted, otherwise YAML reads them as a mapping.
+
+### `xcute.yml` reference
+
+Top level:
+
+- `version` (optional): `1`. Any other value is refused.
+- `name` (optional): shown in headers. Defaults to the name of the folder that contains `xcute.yml`.
+- `topics` (optional): a mapping of topic ids to topics, shown in file order. Each topic has a `title` (required) and a `summary` (optional).
+- `entries` (required): a mapping of entry names to entries, with at least one entry. Names may contain `:` (`release:plan`). `__proto__` is reserved.
+
+Each entry has:
+
+- `description` (required): one sentence, ideally phrased as when you would need it.
+- `topic` (optional): a key under `topics`. Entries without a topic are listed under `Other`.
+- `docs` (optional): a path or URL, printed with the entry. xcute never opens it.
+- exactly one of `commands` (a list of commands, a command entry) or `steps` (a list of steps, a [guide](#guides)).
+
+Each step of a guide has a `title` (required), an optional `text` and `warn`, and exactly one of:
+
+- `run`: one command, or a list of commands;
+- `manual`: what to do by hand;
+- `check`: what to look at and confirm.
+
+Rules:
+
+- Unknown keys anywhere are errors, so a typo such as `comands:` is caught at once.
+- Each command (a `commands` item or a `run` item) must be one line. The commands of an entry or a step are joined with ` && ` and run in one shell, so write one list item per command rather than a `|` block.
+- `text`, `warn`, `manual` and `check` may span several lines.
+- Control characters such as terminal escape sequences or carriage returns are refused everywhere, so what xcute prints is what runs. Tabs and line breaks are fine, except that a command must be one line.
+- A value that starts with `{{` must be quoted (`- "{{pm|pnpm}} test"`). Unquoted, YAML reads it as a mapping, and the error says so.
+- Errors give the file and line. A catalog with errors cannot be run: `xcute list` and `xcute select` print its errors and still show your own actions, and `xcute check` lists every error at once.
 
 ### Running entries
 
@@ -466,12 +516,14 @@ Values are asked when a step first needs them, unless you passed them on the com
 
 ```bash
 xcute release core 1.2.0          # walk through the guide
-xcute show release                # read it without running anything
+xcute show release core 1.2.0     # read it: runs nothing and asks nothing
 xcute release core 1.2.0 --from 3 # start at step 3
-xcute release --dry-run           # print every step, run nothing, ask nothing
+xcute release --dry-run           # walk it, printing each command instead of running it
 ```
 
-If you stop at step N, xcute prints the exact command that picks up there. A failed command offers `Retry`, `Skip` or `Stop`. Walking a guide asks for trust like any other entry, except with `--dry-run`. `--from` only works with guides.
+`xcute show` fills each variable with the value you passed, else its default, else a `<name>` placeholder, and ends with the command that resumes the guide. `--dry-run` walks the steps without running anything or stopping at them, but still asks for values that have no default and were not passed.
+
+If you stop at step N, xcute prints the exact command that picks up there, with the values you gave. A failed command offers `Retry`, `Skip` or `Stop`. Walking a guide asks for trust like any other entry, except with `--dry-run`. `--from` only works with guides.
 
 ### Name clashes
 
@@ -486,7 +538,8 @@ A cloned repository is code someone else wrote, so xcute asks before running any
 - Trust covers the whole file. A changed command in any entry asks before running any entry.
 - Without a terminal, xcute refuses and exits with code 1. Run `xcute trust` in the repository to trust the current catalog without a prompt.
 - `xcute trust --revoke` removes the trust record.
-- Listing, `--dry-run` and other read-only views never ask.
+- Listing, searching in `xcute select`, `xcute show`, `--dry-run` and `xcute check` never ask.
+- Trust records are kept in `trust.json` in the xcute folder (see [Config location](#config-location)), keyed by the real path of `xcute.yml`. A moved repository or a second clone needs its own trust.
 
 Trust does not cover what your commands call. A trusted `pnpm test` runs whatever the `test` script in `package.json` says, and that file is not checked.
 
