@@ -10,6 +10,7 @@ import {
     setConfigDir,
     setAction,
     actionExists,
+    getConfigDir,
 } from '../../src/utils/config.js'
 
 describe('config utilities', () => {
@@ -49,5 +50,50 @@ describe('config utilities', () => {
 
         const filtered = getAllActions('sel')
         expect(Object.keys(filtered)).to.deep.equal(['selected'])
+    })
+
+    describe('getConfigDir', () => {
+        const savedHome = process.env.XCUTE_HOME
+        const savedNodeEnv = process.env.NODE_ENV
+
+        beforeEach(() => {
+            setConfigDir(undefined)
+        })
+
+        afterEach(() => {
+            setConfigDir(undefined)
+            if (savedHome === undefined) delete process.env.XCUTE_HOME
+            else process.env.XCUTE_HOME = savedHome
+            if (savedNodeEnv === undefined) delete process.env.NODE_ENV
+            else process.env.NODE_ENV = savedNodeEnv
+        })
+
+        it('uses XCUTE_HOME when no override is set', () => {
+            process.env.XCUTE_HOME = '/tmp/xcute-home-test'
+            expect(getConfigDir()).to.equal('/tmp/xcute-home-test')
+        })
+
+        it('resolves a relative XCUTE_HOME against the current directory', () => {
+            process.env.XCUTE_HOME = 'rel-home'
+            expect(getConfigDir()).to.equal(path.resolve('rel-home'))
+        })
+
+        it('ignores an empty XCUTE_HOME', () => {
+            process.env.XCUTE_HOME = ''
+            delete process.env.NODE_ENV
+            expect(getConfigDir()).to.equal(path.join(os.homedir(), '.xcute'))
+        })
+
+        it('lets XCUTE_HOME win over NODE_ENV=development', () => {
+            process.env.NODE_ENV = 'development'
+            process.env.XCUTE_HOME = '/tmp/xcute-home-test'
+            expect(getConfigDir()).to.equal('/tmp/xcute-home-test')
+        })
+
+        it('keeps the setConfigDir override above XCUTE_HOME', () => {
+            process.env.XCUTE_HOME = '/tmp/xcute-home-test'
+            setConfigDir('/tmp/override')
+            expect(getConfigDir()).to.equal('/tmp/override')
+        })
     })
 })

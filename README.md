@@ -428,6 +428,8 @@ Actions are stored at:
 ~/.xcute/config.json
 ```
 
+Set `XCUTE_HOME` to move the folder. Everything moves with it: `config.json`, `sync.json`, the sync clone and `trust.json`. After moving an existing folder, re-run `xcute sync-init`, because `sync.json` stores the clone's absolute path.
+
 ---
 
 ## 🤝 Contributions

@@ -13,6 +13,7 @@ export function buildChoices (this: Command, filter?: string) {
 
     // Build choices for the select prompt
     return {
+        actions,
         choices: names.map((name, index) => {
             const action = actions[name]
             const description = action.description ? ` - ${action.description}` : ''
@@ -21,7 +22,6 @@ export function buildChoices (this: Command, filter?: string) {
                 value: name,
             }
         }),
-        actions
     };
 }
 
