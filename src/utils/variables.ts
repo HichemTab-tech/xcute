@@ -1,4 +1,5 @@
-const VARIABLE_PATTERN = /\{\{([\s\S]*?)}}/g
+// A `{{name::description|default}}` token; group 1 is the text between the braces.
+export const VARIABLE_PATTERN = /\{\{([\s\S]*?)}}/g
 
 export interface VariableDefinition {
     defaultValue?: string
@@ -59,17 +60,18 @@ export function extractVariables(commands: string[]): Map<string, VariableDefini
     return variables
 }
 
+// One pass over the original command, inserting each value as plain text: `$&`, `$'` and the like are not
+// expanded, and tokens inside an inserted value are not replaced again. This matches what `xcute show` prints.
 export function replaceVariables(command: string, values: Record<string, {
     replacements: string[],
     result: string
 }>): string {
+    const results = new Map<string, string>()
     for (const value of Object.values(values)) {
-        for (const replacement of value.replacements) {
-            command = command.replace(`{{${replacement}}}`, value.result)
-        }
+        for (const replacement of value.replacements) results.set(replacement, value.result)
     }
 
-    return command;
+    return command.replaceAll(VARIABLE_PATTERN, (token, text: string) => results.get(text) ?? token)
 }
 
 export function replaceAllVariables(commands: string[], values: Record<string, {

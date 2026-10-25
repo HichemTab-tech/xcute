@@ -4,7 +4,7 @@ import type {ResolvedEntry} from './resolver.js'
 import {prompts} from './prompts.js'
 import {executeCommands, resolveVariable} from './runner.js'
 import {entryVariables} from './trust.js'
-import {extractVariables, parseVariableToken, type VariableDefinition} from './variables.js'
+import {extractVariables, parseVariableToken, VARIABLE_PATTERN, type VariableDefinition} from './variables.js'
 
 export function guideVariables(entry: GuideEntry): Map<string, VariableDefinition> {
     return entryVariables(entry)
@@ -29,7 +29,7 @@ export function fillPlaceholders(
     variables: Map<string, VariableDefinition>,
     values: Record<string, string>,
 ): string {
-    return text.replaceAll(/\{\{([\S\s]*?)}}/g, (token, inner: string) => {
+    return text.replaceAll(VARIABLE_PATTERN, (token, inner: string) => {
         const {name} = parseVariableToken(inner)
         if (!name) return token
         return values[name] ?? variables.get(name)?.defaultValue ?? `<${name}>`

@@ -58,6 +58,26 @@ describe('show', () => {
         expect(stdout).to.not.contain('xcute trust')
     })
 
+    it('prints the same command that run would execute when values hold $ patterns', async () => {
+        const r = createCatalogRepo(`entries:
+  hello:
+    description: Print a greeting.
+    commands:
+      - "echo {{greeting|$'}} ; touch PWNED ;'"
+`)
+        cleanup = r.cleanup
+        const expected = "$ echo $' ; touch PWNED ;'"
+
+        const shown = await runCommand(['show', 'hello'])
+        expect(shown.stdout.split('\n')).to.include(expected)
+
+        const dry = await runCommand(['run', 'hello', '--dry-run'])
+        expect(dry.stdout.split('\n')).to.include(expected)
+
+        const provided = await runCommand(['run', 'hello', '$&$$', '--dry-run'])
+        expect(provided.stdout.split('\n')).to.include("$ echo $&$$ ; touch PWNED ;'")
+    })
+
     it('reports an unknown name', async () => {
         const {error} = await runCommand(['show', 'nope'])
         expect(error?.message).to.contain('Action "nope" not found')

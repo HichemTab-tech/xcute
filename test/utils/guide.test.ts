@@ -1,10 +1,11 @@
 import {expect} from 'chai'
 
 import {parseCatalog} from '../../src/utils/catalog-schema.js'
-import type {GuideEntry} from '../../src/utils/catalog-schema.js'
+import type {CommandEntry, GuideEntry} from '../../src/utils/catalog-schema.js'
 import type {LoadedCatalog} from '../../src/utils/catalog.js'
 import {fillPlaceholders, guideVariables, renderEntry, resumeHint, shellQuote} from '../../src/utils/guide.js'
 import {prompts} from '../../src/utils/prompts.js'
+import {runAction} from '../../src/utils/runner.js'
 import {extractVariables} from '../../src/utils/variables.js'
 
 const SOURCE = `name: InertiaX
@@ -94,6 +95,18 @@ describe('guide text', () => {
             const {entry, loaded} = load()
             const text = renderEntry({catalog: loaded, entry, name: 'rehearsal', source: 'project'}, ['grid', '2', 'abc123']).join('\n')
             expect(text).to.contain('$ git switch -c grid/2.x abc123')
+        })
+
+        it('renders $ replacement patterns exactly as runAction logs them', async () => {
+            const {catalog} = parseCatalog(`entries:\n  hello:\n    description: d\n    commands:\n      - "echo {{name}} [{{greeting|$'}}] ; touch PWNED ;'"\n`)
+            const entry = catalog!.entries[0]
+            const loaded: LoadedCatalog = {catalog, dir: '/tmp/x', errors: [], file: '/tmp/x/xcute.yml', name: 'x'}
+            const rendered = renderEntry({catalog: loaded, entry, name: 'hello', source: 'project'}, ['$&$$'])
+            expect(rendered.at(-1)).to.equal("$ echo $&$$ [$'] ; touch PWNED ;'")
+
+            const logged: string[] = []
+            await runAction({commands: (entry as CommandEntry).commands}, {dryRun: true, log: (m) => logged.push(m), logError() {}, providedValues: ['$&$$']})
+            expect(logged).to.deep.equal([rendered.at(-1)])
         })
 
         it('marks by-hand and check steps and shows warnings', () => {

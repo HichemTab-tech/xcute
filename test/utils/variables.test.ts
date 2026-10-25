@@ -146,6 +146,21 @@ describe('variables', () => {
       const result = replaceVariables('echo hello', {name: {replacements: ['name'], result: 'test'}})
       expect(result).to.equal('echo hello')
     })
+
+    it('should insert values literally, without expanding $ replacement patterns', () => {
+      for (const value of ["$'", '$&', '$$', '$`', "a$'b$&c$$d$`e"]) {
+        const result = replaceVariables("echo {{x|$'}} ; tail", {x: {replacements: ["x|$'"], result: value}})
+        expect(result).to.equal(`echo ${value} ; tail`)
+      }
+    })
+
+    it('should not replace tokens that appear inside an inserted value', () => {
+      const result = replaceVariables('echo {{a}} {{b}}', {
+        a: {replacements: ['a'], result: '{{b}}'},
+        b: {replacements: ['b'], result: 'X'},
+      })
+      expect(result).to.equal('echo {{b}} X')
+    })
   })
 
   describe('replaceAllVariables', () => {

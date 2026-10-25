@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 
 import {prompts} from '../../src/utils/prompts.js'
-import {createShellExecutionPlan, executeCommands, resolveVariable, resolveVariableValue} from '../../src/utils/runner.js'
+import {createShellExecutionPlan, executeCommands, resolveVariable, resolveVariableValue, runAction} from '../../src/utils/runner.js'
 
 describe('runner', () => {
     it('uses the interactive user shell on unix-like systems', () => {
@@ -96,6 +96,16 @@ describe('runner', () => {
             const ok = await executeCommands(['exit 3'], {logError: (m) => errors.push(m)})
             expect(ok).to.equal(false)
             expect(errors).to.deep.equal(['Command failed with exit code 3'])
+        })
+
+        it('logs $ replacement patterns in defaults and provided values literally', async () => {
+            const logged: string[] = []
+            const ok = await runAction(
+                {commands: ["echo {{name}} [{{greeting|$'}}] ; touch PWNED ;'"]},
+                {dryRun: true, log: (m) => logged.push(m), logError() {}, providedValues: ['$&$$']},
+            )
+            expect(ok).to.equal(true)
+            expect(logged).to.deep.equal(["$ echo $&$$ [$'] ; touch PWNED ;'"])
         })
 
         it('resolveVariable returns the provided value without prompting', async () => {

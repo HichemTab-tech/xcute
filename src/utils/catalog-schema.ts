@@ -53,6 +53,16 @@ const TOPIC_KEYS = ['title', 'summary']
 const ENTRY_KEYS = ['topic', 'description', 'docs', 'commands', 'steps']
 const STEP_KEYS = ['title', 'text', 'warn', 'run', 'manual', 'check']
 const QUOTE_HINT = 'a value starting with {{ must be quoted'
+// C0 controls except tab and line feed, DEL and C1 controls: a terminal acts on them, so a catalog could
+// print one command and run another.
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARACTER = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/
+
+// Error messages quote names and keys from the file; control characters in them are shown escaped.
+function visible(text: string): string {
+    // eslint-disable-next-line no-control-regex
+    return text.replaceAll(/[\u0000-\u001F\u007F-\u009F]/g, (char) => `\\u${char.codePointAt(0)!.toString(16).padStart(4, '0')}`)
+}
 
 export function formatCatalogError(file: string, error: CatalogError): string {
     return error.line === undefined ? `${file}: ${error.message}` : `${file}:${error.line}: ${error.message}`
@@ -82,8 +92,10 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
 
     // A plain string field; reports a quoting hint when `{{...}}` parsed as a flow mapping.
     const readString = (node: unknown, where: string, field: string): string | undefined => {
-        if (isScalar(node) && typeof node.value === 'string') return node.value
-        if (isMap(node) && node.flow) {
+        if (isScalar(node) && typeof node.value === 'string') {
+            if (!CONTROL_CHARACTER.test(node.value)) return node.value
+            fail(node, `${where}${field} contains a control character`)
+        } else if (isMap(node) && node.flow) {
             fail(node, `${where}${field} looks like a mapping; ${QUOTE_HINT}`)
         } else {
             fail(node, `${where}${field} must be a string`)
@@ -105,7 +117,7 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
             if (allowed.includes(key)) {
                 found.set(key, {key: pair.key, value: pair.value})
             } else {
-                fail(pair.key, `${where}unknown key "${key}"`)
+                fail(pair.key, `${where}unknown key "${visible(key)}"`)
             }
         }
 
@@ -121,7 +133,15 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
         return f ? readString(f.value, where, field) : undefined
     }
 
-    const readStringList = (node: unknown, where: string, field: string, allowScalar: boolean): string[] | undefined => {
+    // One command; commands are joined with ` && `, so a line break inside one would break the chain.
+    const readCommand = (node: unknown, where: string, label: string): string | undefined => {
+        const command = readString(node, where, label)
+        if (command === undefined || !command.includes('\n')) return command
+        fail(node, `${where}${label} has a line break; each command must be one line`)
+        return undefined
+    }
+
+    const readCommandList = (node: unknown, where: string, field: string, allowScalar: boolean): string[] | undefined => {
         if (isSeq(node)) {
             if (node.items.length === 0) {
                 fail(node, `${where}${field} must not be empty`)
@@ -131,7 +151,7 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
             const out: string[] = []
             let ok = true
             for (const item of node.items) {
-                const s = readString(item, where, `${field} item`)
+                const s = readCommand(item, where, `${field} item`)
                 if (s === undefined) ok = false
                 else out.push(s)
             }
@@ -140,7 +160,7 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
         }
 
         if (allowScalar) {
-            const s = readString(node, where, field)
+            const s = readCommand(node, where, field)
             return s === undefined ? undefined : [s]
         }
 
@@ -149,7 +169,7 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
     }
 
     const readStep = (node: unknown, entryName: string, index: number): GuideStep | undefined => {
-        const where = `entry "${entryName}", step ${index + 1}: `
+        const where = `entry "${visible(entryName)}", step ${index + 1}: `
         const before = errors.length
         const fields = readKeys(node, STEP_KEYS, where)
         if (!fields) return undefined
@@ -167,7 +187,7 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
             const kind = kinds[0]
             const {value} = (fields.get(kind)!)
             if (kind === 'run') {
-                const run = readStringList(value, where, 'run', true)
+                const run = readCommandList(value, where, 'run', true)
                 step = {kind, run}
             } else {
                 step = {[kind]: readString(value, where, kind), kind}
@@ -181,10 +201,15 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
     }
 
     const readEntry = (name: string, keyNode: unknown, node: unknown, topicIds: Set<string>): CatalogEntry | undefined => {
-        const where = `entry "${name}": `
+        const where = `entry "${visible(name)}": `
         const before = errors.length
         if (name === '__proto__') {
             fail(keyNode, `${where}this name is reserved`)
+            return undefined
+        }
+
+        if (CONTROL_CHARACTER.test(name)) {
+            fail(keyNode, `${where}name contains a control character`)
             return undefined
         }
 
@@ -200,7 +225,7 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
         if (topicField) {
             topic = readString(topicField.value, where, 'topic')
             if (topic !== undefined && !topicIds.has(topic)) {
-                fail(topicField.value, `${where}topic "${topic}" is not declared`)
+                fail(topicField.value, `${where}topic "${visible(topic)}" is not declared`)
             }
         }
 
@@ -211,7 +236,7 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
         if (commandsField && stepsField) {
             fail(keyNode, `${where}use either commands or steps`)
         } else if (commandsField) {
-            commands = readStringList(commandsField.value, where, 'commands', false)
+            commands = readCommandList(commandsField.value, where, 'commands', false)
         } else if (stepsField) {
             const list = stepsField.value
             if (!isSeq(list)) {
@@ -262,7 +287,12 @@ export function parseCatalog(source: string): {catalog?: Catalog; errors: Catalo
 
         for (const pair of topicsField.value.items) {
             const id = String((pair.key as {value?: unknown})?.value ?? pair.key)
-            const where = `topic "${id}": `
+            const where = `topic "${visible(id)}": `
+            if (CONTROL_CHARACTER.test(id)) {
+                fail(pair.key, `${where}id contains a control character`)
+                continue
+            }
+
             const fields = readKeys(pair.value, TOPIC_KEYS, where)
             if (!fields) continue
             const titleField = fields.get('title')

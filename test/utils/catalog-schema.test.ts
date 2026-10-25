@@ -132,6 +132,88 @@ describe('catalog schema', () => {
         expect(errors.map((e) => e.message).join('\n')).to.include('must be quoted')
     })
 
+    describe('control characters', () => {
+        it('rejects an escape sequence in a command', () => {
+            const errors = msgs('entries:\n  x:\n    description: d\n    commands:\n      - "touch PWNED #\\e[2K\\r      echo hello"\n')
+            expect(errors).to.deep.equal([{line: 5, message: 'entry "x": commands item contains a control character'}])
+        })
+
+        it('rejects an escape sequence in a warning', () => {
+            const errors = msgs('entries:\n  g:\n    description: d\n    steps:\n      - title: t\n        warn: "Read carefully.\\e[8m"\n        run: echo hi\n')
+            expect(errors).to.deep.equal([{line: 6, message: 'entry "g", step 1: warn contains a control character'}])
+        })
+
+        it('rejects a carriage return in an entry name and shows it escaped', () => {
+            const errors = msgs('entries:\n  "lint\\r":\n    description: d\n    commands: [a]\n')
+            expect(errors).to.deep.equal([{line: 2, message: String.raw`entry "lint\u000d": name contains a control character`}])
+        })
+
+        it('rejects control characters in topic ids, titles, the catalog name and descriptions', () => {
+            const errors = msgs([
+                'name: "Demo\\x07"',
+                'topics:',
+                '  "ops\\e":',
+                '    title: Ops',
+                '  site:',
+                '    title: "Site\\x7f"',
+                'entries:',
+                '  x:',
+                '    description: "d\\u009b2K"',
+                '    commands: [a]',
+                '',
+            ].join('\n'))
+            expect(errors).to.deep.equal([
+                {line: 1, message: 'name contains a control character'},
+                {line: 3, message: String.raw`topic "ops\u001b": id contains a control character`},
+                {line: 6, message: 'topic "site": title contains a control character'},
+                {line: 9, message: 'entry "x": description contains a control character'},
+            ])
+        })
+
+        it('shows an unknown key with a control character escaped', () => {
+            const errors = msgs('entries:\n  x:\n    description: d\n    "commands\\e": [a]\n    commands: [a]\n')
+            expect(errors).to.deep.equal([{line: 4, message: String.raw`entry "x": unknown key "commands\u001b"`}])
+        })
+
+        it('rejects a command that spans several lines', () => {
+            const errors = msgs('entries:\n  x:\n    description: d\n    commands:\n      - |\n        echo a\n        echo b\n')
+            expect(errors).to.deep.equal([{line: 5, message: 'entry "x": commands item has a line break; each command must be one line'}])
+        })
+
+        it('rejects a run item or a run string that spans several lines', () => {
+            const listed = msgs('entries:\n  g:\n    description: d\n    steps:\n      - title: t\n        run:\n          - echo a\n          - "echo b\\necho c"\n')
+            expect(listed).to.deep.equal([{line: 8, message: 'entry "g", step 1: run item has a line break; each command must be one line'}])
+            const scalar = msgs('entries:\n  g:\n    description: d\n    steps:\n      - title: t\n        run: |\n          echo a\n')
+            expect(scalar).to.deep.equal([{line: 6, message: 'entry "g", step 1: run has a line break; each command must be one line'}])
+        })
+
+        it('keeps multi-line prose with tabs valid in text, warn, manual and check', () => {
+            const {catalog, errors} = parseCatalog([
+                'entries:',
+                '  g:',
+                '    description: d',
+                '    steps:',
+                '      - title: t',
+                '        text: |',
+                '          line one',
+                '          line two',
+                '        warn: "careful\\tnow\\nreally"',
+                '        manual: |',
+                '          do this',
+                '          then that',
+                '      - title: u',
+                '        check: |',
+                '          look here',
+                '          and there',
+                '',
+            ].join('\n'))
+            expect(errors).to.deep.equal([])
+            const step = (catalog!.entries[0] as GuideEntry).steps[0]
+            expect(step.text).to.equal('line one\nline two\n')
+            expect(step.warn).to.equal('careful\tnow\nreally')
+        })
+    })
+
     it('formats errors as file:line: message', () => {
         expect(formatCatalogError('/r/xcute.yml', {line: 4, message: 'boom'})).to.equal('/r/xcute.yml:4: boom')
         expect(formatCatalogError('/r/xcute.yml', {message: 'boom'})).to.equal('/r/xcute.yml: boom')
