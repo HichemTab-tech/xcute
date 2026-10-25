@@ -281,6 +281,10 @@ xcute s react           # same via alias
 xcute select -f react   # legacy filter flag
 ```
 
+### `xcute show <name>`, `xcute trust` and `xcute check`
+
+`show`, `trust` and `check` work on the project catalog (see [Project catalogs](#project-catalogs)). They are built-in command names, so an action called `show`, `trust` or `check` can only be run with `xcute run <name>`.
+
 ### `xcute remove <name>`
 
 Remove a action.
@@ -487,6 +491,16 @@ A cloned repository is code someone else wrote, so xcute asks before running any
 Trust does not cover what your commands call. A trusted `pnpm test` runs whatever the `test` script in `package.json` says, and that file is not checked.
 
 Catalogs are committed to the repository, so never put secrets in them. Use variables and let each person supply the value.
+
+### Checking a catalog
+
+`xcute check` validates the `xcute.yml` found from the current directory and compares it with the `package.json` next to it. It runs nothing and needs no trust.
+
+- Validation errors are printed with their line numbers, or `<file>: OK (N entries)`.
+- `Missing scripts:` lists entries whose commands call a `package.json` script that does not exist. This is a heuristic over `pnpm`, `npm`, `yarn` and `bun` command forms (`pnpm lint`, `pnpm run lint`, `npm run lint`, `yarn lint`, `bun run lint`). Package manager built-ins, names found in `node_modules/.bin`, and commands using `--filter`, `-r`, `-C` and similar flags are skipped.
+- `Scripts no entry mentions (N):` lists root scripts that no entry or guide step calls. This list appears only in `xcute check`.
+
+It exits with code 1 when there are validation errors or missing scripts, and 0 otherwise. Uncovered scripts never fail it.
 
 ## Examples
 
