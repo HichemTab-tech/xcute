@@ -8,7 +8,7 @@ import * as path from 'node:path'
 import commandNotFoundHook from '../../src/hooks/command_not_found.js'
 import {loadCatalog} from '../../src/utils/catalog.js'
 import {setConfigDir} from '../../src/utils/config.js'
-import {terminal} from '../../src/utils/prompts.js'
+import {prompts, terminal} from '../../src/utils/prompts.js'
 import {runnableParts, writeTrust} from '../../src/utils/trust.js'
 import {createCatalogRepo} from '../helpers/catalog-repo.js'
 
@@ -222,6 +222,119 @@ ${extra}`
 
             const result = await runHook(['ci:lint', '--dry-run'], 'ci:lint')
             expect(result.stdout).to.contain('$ echo linting')
+        })
+
+        describe('guides', () => {
+            const originalSelect = prompts.select
+            let answers: string[]
+            let selectCalls: number
+
+            const guideSource = `version: 1
+name: Demo
+topics:
+  ops:
+    title: Operations
+entries:
+  rehearsal:
+    topic: ops
+    description: Rehearse.
+    steps:
+      - title: First {{component::Component}} {{major::Major}}
+        run: ${touch('m1.txt')}
+      - title: Hand step
+        manual: Do it.
+      - title: Third
+        run: ${touch('m3.txt')}
+      - title: Fourth
+        run: ${touch('m4.txt')}
+`
+
+            beforeEach(() => {
+                answers = []
+                selectCalls = 0
+                prompts.select = (async () => {
+                    selectCalls++
+                    return answers.shift()
+                }) as unknown as typeof prompts.select
+            })
+
+            afterEach(() => {
+                prompts.select = originalSelect
+            })
+
+            it('walks a trusted guide through xcute run', async () => {
+                const {dir} = repo(guideSource)
+                answers = ['run', 'continue', 'run', 'run']
+
+                const {stdout} = await runCommand(['run', 'rehearsal', 'table', '0'])
+                expect(stdout).to.contain('Demo · Operations')
+                expect(stdout).to.contain('Guide done.')
+                expect(fs.existsSync(path.join(dir, 'm1.txt'))).to.equal(true)
+                expect(fs.existsSync(path.join(dir, 'm4.txt'))).to.equal(true)
+            })
+
+            it('walks a guide through the shortcut with values and --from', async () => {
+                const {dir} = repo(guideSource)
+                answers = ['run']
+
+                const result = await runHook(['rehearsal', 'table', '0', '--from', '4'], 'rehearsal')
+                expect(result.code).to.equal(0)
+                expect(result.stdout).to.contain('4/4')
+                expect(fs.existsSync(path.join(dir, 'm1.txt'))).to.equal(false)
+                expect(fs.existsSync(path.join(dir, 'm4.txt'))).to.equal(true)
+            })
+
+            it('asks for trust before the first step of an untrusted guide', async () => {
+                const {dir} = repo(guideSource, false)
+                terminal.isInteractive = () => true
+                answers = ['trust', 'run', 'continue', 'run', 'run']
+
+                await runCommand(['run', 'rehearsal', 'table', '0'])
+                expect(fs.existsSync(path.join(dir, 'm1.txt'))).to.equal(true)
+                expect(selectCalls).to.equal(5)
+            })
+
+            it('refuses an untrusted guide without a TTY', async () => {
+                const {dir} = repo(guideSource, false)
+
+                const {error} = await runCommand(['run', 'rehearsal', 'table', '0'])
+                expect(error?.oclif?.exit).to.equal(1)
+                expect(selectCalls).to.equal(0)
+                expect(fs.existsSync(path.join(dir, 'm1.txt'))).to.equal(false)
+            })
+
+            it('dry-runs a guide without trust', async () => {
+                const {dir} = repo(guideSource, false)
+
+                const {stdout} = await runCommand(['run', 'rehearsal', 'table', '0', '--dry-run'])
+                expect(stdout).to.contain('1/4')
+                expect(selectCalls).to.equal(0)
+                expect(fs.existsSync(path.join(dir, 'm1.txt'))).to.equal(false)
+            })
+
+            it('rejects --from abc through the shortcut', async () => {
+                repo(guideSource)
+
+                const result = await runHook(['rehearsal', '--from', 'abc'], 'rehearsal')
+                expect(result.code).to.equal(1)
+                expect(result.stderr).to.contain('--from must be a step number between 1 and 4')
+            })
+
+            it('rejects a bare trailing --from through the shortcut', async () => {
+                repo(guideSource)
+
+                const result = await runHook(['rehearsal', '--from'], 'rehearsal')
+                expect(result.code).to.equal(1)
+                expect(result.stderr).to.contain('--from must be a step number between 1 and 4')
+            })
+
+            it('rejects --from for an entry that is not a guide', async () => {
+                repo(catalogSource())
+
+                const result = await runHook(['make-file', '--from', '2'], 'make-file')
+                expect(result.code).to.equal(1)
+                expect(result.stderr).to.contain('--from only works with guides')
+            })
         })
 
         it('prints catalog errors when the name is not found and xcute.yml is invalid', async () => {

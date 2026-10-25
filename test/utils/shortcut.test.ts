@@ -14,4 +14,10 @@ describe('parseShortcutArgs', () => {
             dryRun: true, from: '4', interactive: false, project: false, values: [],
         })
     })
+
+    it('turns a bare trailing --from into an empty value', () => {
+        expect(parseShortcutArgs(['table', '--from'])).to.deep.equal({
+            dryRun: false, from: '', interactive: false, project: false, values: ['table'],
+        })
+    })
 })

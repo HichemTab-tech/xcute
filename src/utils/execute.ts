@@ -1,3 +1,4 @@
+import {walkGuide} from './guide.js'
 import {ResolvedEntry} from './resolver.js'
 import {runAction} from './runner.js'
 import {ensureTrusted} from './trust-gate.js'
@@ -25,17 +26,27 @@ export async function executeEntry(resolved: ResolvedEntry, options: ExecuteOpti
     }
 
     const {catalog, entry} = resolved
-    if (entry.kind === 'guide') {
-        logError(`"${resolved.name}" is a guide.`)
-        return 1
-    }
-
-    if (from !== undefined) {
+    if (from !== undefined && entry.kind !== 'guide') {
         logError('--from only works with guides')
         return 1
     }
 
     if (!dryRun && !(await ensureTrusted(catalog, log))) return 1
+
+    if (entry.kind === 'guide') {
+        return walkGuide(entry, {
+            catalogName: catalog.name,
+            cwd: catalog.dir,
+            dryRun,
+            from: from === undefined ? undefined : (from.trim() === '' ? Number.NaN : Number(from)),
+            interactive,
+            log,
+            logError,
+            name: resolved.name,
+            providedValues: providedValues ?? [],
+            topicTitle: catalog.catalog?.topics.find((topic) => topic.id === entry.topic)?.title,
+        })
+    }
 
     const ok = await runAction(
         {commands: entry.commands, description: entry.description},
