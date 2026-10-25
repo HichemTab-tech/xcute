@@ -430,6 +430,42 @@ xcute run --project lint
 
 Catalog commands always run from the directory that contains `xcute.yml`, wherever you invoked xcute. Personal actions keep running from your current directory.
 
+### Guides
+
+An entry with `steps:` instead of `commands:` is a guide: a checklist you walk through one step at a time. Each step has a `title` and exactly one of three kinds, plus optional `text` and `warn` lines.
+
+- `run` runs one or more commands, after you choose `Run`, `Skip` or `Stop`.
+- `manual` is something you do by hand. You confirm with `Done, continue`.
+- `check` is something to look at. You confirm with `Looks right, continue`.
+
+```yaml
+entries:
+  release:
+    description: Cut a release.
+    steps:
+      - title: Run the tests
+        run: pnpm test
+      - title: Bump {{component::Component}} to {{version::Version}}
+        run:
+          - pnpm version {{version}}
+        warn: This creates a commit and a tag.
+      - title: Merge the release pull request
+        manual: Merge it on GitHub once CI is green.
+      - title: Check the published package
+        check: "{{component}} {{version}} shows up on the registry."
+```
+
+Values are asked when a step first needs them, unless you passed them on the command line (`xcute release core 1.2.0`). Values given as arguments fill the guide's variables in the order they first appear.
+
+```bash
+xcute release core 1.2.0          # walk through the guide
+xcute show release                # read it without running anything
+xcute release core 1.2.0 --from 3 # start at step 3
+xcute release --dry-run           # print every step, run nothing, ask nothing
+```
+
+If you stop at step N, xcute prints the exact command that picks up there. A failed command offers `Retry`, `Skip` or `Stop`. Walking a guide asks for trust like any other entry, except with `--dry-run`. `--from` only works with guides.
+
 ### Name clashes
 
 Personal actions win. If you have a personal action called `lint` and the catalog has one too, `xcute lint` runs yours. Use `xcute run --project lint` to run the catalog entry. `xcute remove` only touches personal actions and tells you to edit `xcute.yml` for catalog entries.

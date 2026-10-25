@@ -28,7 +28,7 @@ export function parseShortcutArgs(args: string[]): ShortcutArgs {
         break;
         }
 
-        default: { if (arg === '--from' && i + 1 < args.length) parsed.from = args[++i]
+        default: { if (arg === '--from') parsed.from = i + 1 < args.length ? args[++i] : ''
         else if (arg.startsWith('--from=')) parsed.from = arg.slice('--from='.length)
         else parsed.values.push(arg)
         }
