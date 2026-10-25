@@ -32,6 +32,9 @@ importers:
       strip-ansi:
         specifier: ^7.2.0
         version: 7.2.0
+      yaml:
+        specifier: ^2.9.1
+        version: 2.9.1
     devDependencies:
       '@changesets/cli':
         specifier: ^3.0.3
