@@ -214,6 +214,27 @@ describe('catalog schema', () => {
         })
     })
 
+    it('names the catalog when the top level is not a mapping', () => {
+        expect(msgs('- a\n- b\n')).to.deep.equal([{line: 1, message: 'catalog must be a mapping'}])
+        expect(msgs('hello\n')).to.deep.equal([{line: 1, message: 'catalog must be a mapping'}])
+    })
+
+    it('hints at quoting when an unquoted {{ value with more text is a syntax error', () => {
+        const listed = msgs('entries:\n  x:\n    description: d\n    commands:\n      - {{x}} more text\n')
+        expect(listed).to.have.length(1)
+        expect(listed[0].line).to.equal(5)
+        expect(listed[0].message).to.match(/^Unexpected scalar at node end.*; a value starting with \{\{ must be quoted$/)
+
+        const mapped = msgs('entries:\n  x:\n    description: d\n    steps:\n      - title: t\n        run: {{x}} more\n')
+        expect(mapped[0].line).to.equal(6)
+        expect(mapped[0].message).to.contain('a value starting with {{ must be quoted')
+    })
+
+    it('does not add the quoting hint to unrelated syntax errors', () => {
+        const errors = msgs('entries:\n  a:\n    description: d\n\tcommands: [x]\n')
+        expect(errors.map((e) => e.message).join('\n')).to.not.contain('must be quoted')
+    })
+
     it('formats errors as file:line: message', () => {
         expect(formatCatalogError('/r/xcute.yml', {line: 4, message: 'boom'})).to.equal('/r/xcute.yml:4: boom')
         expect(formatCatalogError('/r/xcute.yml', {message: 'boom'})).to.equal('/r/xcute.yml: boom')

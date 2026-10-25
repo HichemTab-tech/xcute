@@ -179,6 +179,26 @@ entries:
         expect(readTrust(file)).to.equal(undefined)
     })
 
+    it('treats a record with a malformed entry as untrusted', () => {
+        const file = path.join(dir, 'xcute.yml')
+        fs.writeFileSync(file, '')
+        const malformed: unknown[] = [
+            {x: {kind: 'commands'}},
+            {x: {commands: [['a']], kind: 'script'}},
+            {x: {commands: ['a'], kind: 'commands'}},
+            {x: {commands: [['a', 1]], kind: 'guide'}},
+            {x: null},
+            {x: 'pnpm lint'},
+        ]
+        for (const runnable of malformed) {
+            fs.writeFileSync(getTrustFile(), JSON.stringify({[fs.realpathSync(file)]: {runnable, trustedAt: 'x'}}))
+            expect(readTrust(file), JSON.stringify(runnable)).to.equal(undefined)
+        }
+
+        fs.writeFileSync(getTrustFile(), JSON.stringify({[fs.realpathSync(file)]: {runnable: {x: {commands: [['a'], []], kind: 'guide'}}, trustedAt: 'x'}}))
+        expect(readTrust(file)).to.deep.equal({x: {commands: [['a'], []], kind: 'guide'}})
+    })
+
     it('detects an added __proto__ entry, in memory and after a trust.json round trip', () => {
         const base = load(cmd('one'))
         const evil = {

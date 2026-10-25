@@ -31,6 +31,21 @@ describe('check utils', () => {
         expect(scriptCalledBy('pnpm -r run build')).to.deep.equal([])
     })
 
+    it('knows more pnpm and yarn built-ins', () => {
+        for (const command of ['pnpm version patch', 'pnpm view react', 'pnpm info react', 'pnpm whoami', 'pnpm doctor', 'pnpm cache list', 'pnpm help', 'pnpm self-update']) {
+            expect(scriptCalledBy(command), command).to.deep.equal([])
+        }
+
+        for (const command of ['yarn version', 'yarn why react', 'yarn info react', 'yarn config get x', 'yarn cache clean', 'yarn workspaces list', 'yarn set version stable', 'yarn plugin import x', 'yarn npm publish', 'yarn link', 'yarn pack', 'yarn publish', 'yarn bin', 'yarn dedupe', 'yarn explain x', 'yarn rebuild', 'yarn unlink']) {
+            expect(scriptCalledBy(command), command).to.deep.equal([])
+        }
+    })
+
+    it('reads pnpm t as the test script', () => {
+        expect(scriptCalledBy('pnpm t')).to.deep.equal(['test'])
+        expect(scriptCalledBy('pnpm run t')).to.deep.equal(['t'])
+    })
+
     it('treats a bare name with a node_modules/.bin entry as a binary', () => {
         const {dir} = (() => {
             const r = createCatalogRepo(undefined)

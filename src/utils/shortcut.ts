@@ -11,27 +11,32 @@ export function parseShortcutArgs(args: string[]): ShortcutArgs {
     for (let i = 0; i < args.length; i++) {
         const arg = args[i]
         switch (arg) {
-        case '--dry-run': 
-        case '-d': {
-        parsed.dryRun = true
-        break;
-        }
+            case '--dry-run':
+            case '-d': {
+                parsed.dryRun = true
+                break
+            }
 
-        case '--interactive': 
-        case '-i': {
-        parsed.interactive = true
-        break;
-        }
+            case '--from': {
+                parsed.from = i + 1 < args.length ? args[++i] : ''
+                break
+            }
 
-        case '--project': {
-        parsed.project = true
-        break;
-        }
+            case '--interactive':
+            case '-i': {
+                parsed.interactive = true
+                break
+            }
 
-        default: { if (arg === '--from') parsed.from = i + 1 < args.length ? args[++i] : ''
-        else if (arg.startsWith('--from=')) parsed.from = arg.slice('--from='.length)
-        else parsed.values.push(arg)
-        }
+            case '--project': {
+                parsed.project = true
+                break
+            }
+
+            default: {
+                if (arg.startsWith('--from=')) parsed.from = arg.slice('--from='.length)
+                else parsed.values.push(arg)
+            }
         }
     }
 

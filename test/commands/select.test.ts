@@ -7,7 +7,7 @@ import * as path from 'node:path'
 import {loadCatalog} from '../../src/utils/catalog.js'
 import {getCustomConfig, setConfigDir, setIncludePresets} from '../../src/utils/config.js'
 import {type PickerChoice} from '../../src/utils/picker.js'
-import {prompts} from '../../src/utils/prompts.js'
+import {prompts, terminal} from '../../src/utils/prompts.js'
 import {runnableParts, writeTrust} from '../../src/utils/trust.js'
 import {createCatalogRepo} from '../helpers/catalog-repo.js'
 
@@ -24,6 +24,7 @@ describe('select', () => {
     let testDir: string
     let originalSearch: typeof prompts.search
     let originalSelect: typeof prompts.select
+    let originalInteractive: typeof terminal.isInteractive
     let seen: SearchOptions[]
     let cleanup: (() => void) | undefined
     const originalIncludePresets = getCustomConfig().includePresets
@@ -35,6 +36,7 @@ describe('select', () => {
         setIncludePresets(false)
         originalSearch = prompts.search
         originalSelect = prompts.select
+        originalInteractive = terminal.isInteractive
         seen = []
     })
 
@@ -44,6 +46,7 @@ describe('select', () => {
         fs.rmSync(testDir, {force: true, recursive: true})
         prompts.search = originalSearch
         prompts.select = originalSelect
+        terminal.isInteractive = originalInteractive
         setIncludePresets(originalIncludePresets)
         setConfigDir(originalDir)
     })
@@ -100,6 +103,8 @@ entries:
     steps:
       - title: Look around
         manual: Open the site.
+      - title: Leave a mark
+        run: ${touch('toured.txt')}
 `
 
     it('selects and runs an action', async () => {
@@ -224,6 +229,34 @@ entries:
             expect(selectOptions.choices.map((choice: any) => choice.name)).to.deep.equal(['Walk through it', 'Just read it'])
             expect(stdout).to.contain('Look around')
             expect(stdout).not.to.contain('Running action')
+        })
+
+        it('walks a guide when Walk through it is chosen', async () => {
+            const {dir} = repo(catalogSource)
+            answerSearch((options) => pickEntry('tour', 'tour')(options))
+            const answers = ['walk', 'continue', 'run']
+            prompts.select = (async () => answers.shift()) as any
+
+            const {error, stdout} = await runCommand(['select'])
+
+            expect(error).to.equal(undefined)
+            expect(answers).to.deep.equal([])
+            expect(stdout).to.contain('── 1/2  Look around [by hand]')
+            expect(stdout).to.contain('Guide done.')
+            expect(fs.existsSync(path.join(dir, 'toured.txt'))).to.equal(true)
+        })
+
+        it('refuses to run from an untrusted catalog without a terminal', async () => {
+            const r = createCatalogRepo(catalogSource)
+            cleanup = r.cleanup
+            terminal.isInteractive = () => false
+            answerSearch(pickEntry('build-api', 'build'))
+
+            const {error, stdout} = await runCommand(['s'])
+
+            expect(error?.oclif?.exit).to.equal(1)
+            expect(stdout).to.contain('xcute trust')
+            expect(fs.existsSync(path.join(r.dir, 'built.txt'))).to.equal(false)
         })
 
         it('prints the header and applies the CLI filter before the typed term', async () => {

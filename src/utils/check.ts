@@ -11,12 +11,19 @@ export interface CheckReport {
 }
 
 const PNPM_BUILT_INS = new Set([
-    'add', 'approve-builds', 'audit', 'bin', 'config', 'create', 'dedupe', 'deploy', 'dlx', 'env', 'exec', 'fetch',
-    'i', 'import', 'init', 'install', 'install-test', 'licenses', 'link', 'list', 'ln', 'ls', 'outdated', 'pack',
-    'patch', 'patch-commit', 'prune', 'publish', 'rebuild', 'remove', 'rm', 'root', 'server', 'setup', 'store', 'un',
-    'uninstall', 'unlink', 'up', 'update', 'why',
+    'add', 'approve-builds', 'audit', 'bin', 'cache', 'config', 'create', 'dedupe', 'deploy', 'dlx', 'doctor', 'env',
+    'exec', 'fetch', 'help', 'i', 'import', 'info', 'init', 'install', 'install-test', 'licenses', 'link', 'list', 'ln',
+    'ls', 'outdated', 'pack', 'patch', 'patch-commit', 'prune', 'publish', 'rebuild', 'remove', 'rm', 'root',
+    'self-update', 'server', 'setup', 'store', 'un', 'uninstall', 'unlink', 'up', 'update', 'version', 'view',
+    'whoami', 'why',
 ])
-const YARN_BUILT_INS = new Set(['add', 'create', 'dlx', 'exec', 'init', 'install', 'remove', 'up', 'upgrade', 'workspace'])
+// pnpm subcommands that run a script under another name.
+const PNPM_SCRIPT_ALIASES: Record<string, string> = {t: 'test'}
+const YARN_BUILT_INS = new Set([
+    'add', 'bin', 'cache', 'config', 'create', 'dedupe', 'dlx', 'exec', 'explain', 'info', 'init', 'install', 'link',
+    'npm', 'pack', 'plugin', 'publish', 'rebuild', 'remove', 'set', 'unlink', 'up', 'upgrade', 'version', 'why',
+    'workspace', 'workspaces',
+])
 const SKIP_TOKENS = new Set(['--cwd', '--dir', '--filter', '--prefix', '--recursive', '-C', '-F', '-r'])
 
 function usable(name: string | undefined): string | undefined {
@@ -41,6 +48,7 @@ function scriptOfSegment(tokens: string[], binDir: string | undefined): string |
             if (first === 'run') return usable(second)
             const name = usable(first)
             if (!name) return undefined
+            if (manager === 'pnpm' && Object.hasOwn(PNPM_SCRIPT_ALIASES, name)) return PNPM_SCRIPT_ALIASES[name]
             const builtIns = manager === 'pnpm' ? PNPM_BUILT_INS : YARN_BUILT_INS
             return builtIns.has(name) || isBinary(name) ? undefined : name
         }

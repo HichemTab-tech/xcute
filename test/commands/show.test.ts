@@ -78,6 +78,20 @@ describe('show', () => {
         expect(provided.stdout.split('\n')).to.include("$ echo $&$$ ; touch PWNED ;'")
     })
 
+    it('ends a guide with a resume line holding the values passed', async () => {
+        const r = createCatalogRepo(`entries:
+  rehearsal:
+    description: Rehearse.
+    steps:
+      - title: Plan {{component}} {{major}}
+        run: pnpm line plan {{component}} {{major}}
+`)
+        cleanup = r.cleanup
+
+        const {stdout} = await runCommand(['show', 'rehearsal', 'table', '0'])
+        expect(stdout).to.contain('Closed the terminal partway? Pick up again: xcute rehearsal table 0 --from <n>')
+    })
+
     it('reports an unknown name', async () => {
         const {error} = await runCommand(['show', 'nope'])
         expect(error?.message).to.contain('Action "nope" not found')

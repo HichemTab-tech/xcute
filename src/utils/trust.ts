@@ -1,7 +1,7 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
-import type {Catalog, CatalogEntry} from './catalog-schema.js'
+import type {Catalog, CatalogEntry, GuideStep} from './catalog-schema.js'
 
 import {getConfigDir} from './config.js'
 import {extractVariables, parseVariableToken, VARIABLE_PATTERN, type VariableDefinition} from './variables.js'
@@ -25,22 +25,23 @@ interface TrustRecord {
     trustedAt: string
 }
 
+// A step's fields in the order variables are numbered: title, text, warn, then run, manual or check.
+export function stepTexts(step: GuideStep): string[] {
+    const texts = [step.title]
+    if (step.text !== undefined) texts.push(step.text)
+    if (step.warn !== undefined) texts.push(step.warn)
+    if (step.run) texts.push(...step.run)
+    if (step.manual !== undefined) texts.push(step.manual)
+    if (step.check !== undefined) texts.push(step.check)
+    return texts
+}
+
 export function entryVariables(entry: CatalogEntry): Map<string, VariableDefinition> {
     if (entry.kind === 'commands') {
         return extractVariables(entry.commands)
     }
 
-    const texts: string[] = []
-    for (const step of entry.steps) {
-        texts.push(step.title)
-        if (step.text !== undefined) texts.push(step.text)
-        if (step.warn !== undefined) texts.push(step.warn)
-        if (step.run) texts.push(...step.run)
-        if (step.manual !== undefined) texts.push(step.manual)
-        if (step.check !== undefined) texts.push(step.check)
-    }
-
-    return extractVariables(texts)
+    return extractVariables(entry.steps.flatMap((step) => stepTexts(step)))
 }
 
 export function canonicalCommand(command: string, variables: Map<string, VariableDefinition>): string {
@@ -188,10 +189,19 @@ function writeStore(store: Record<string, TrustRecord>): void {
     fs.writeFileSync(getTrustFile(), JSON.stringify(store, null, 2))
 }
 
+function isRunnableEntry(value: unknown): value is RunnableEntry {
+    if (!value || typeof value !== 'object') return false
+    const {commands, kind} = value as {commands?: unknown; kind?: unknown}
+    return (kind === 'commands' || kind === 'guide')
+        && Array.isArray(commands)
+        && commands.every((step) => Array.isArray(step) && step.every((command) => typeof command === 'string'))
+}
+
+// A record of the wrong shape (hand-edited or from another version) counts as no trust at all.
 export function readTrust(catalogFile: string): RunnableParts | undefined {
-    const record = readStore()[catalogKey(catalogFile)]
-    const runnable = record?.runnable
-    return runnable && typeof runnable === 'object' && !Array.isArray(runnable) ? runnable : undefined
+    const runnable: unknown = readStore()[catalogKey(catalogFile)]?.runnable
+    if (!runnable || typeof runnable !== 'object' || Array.isArray(runnable)) return undefined
+    return Object.values(runnable).every((entry) => isRunnableEntry(entry)) ? (runnable as RunnableParts) : undefined
 }
 
 export function writeTrust(catalogFile: string, parts: RunnableParts): void {

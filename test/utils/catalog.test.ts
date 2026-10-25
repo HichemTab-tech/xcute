@@ -65,6 +65,21 @@ describe('catalog discovery', () => {
         }
     })
 
+    it('uses the folder of a symlinked xcute.yml as the catalog directory and its target as the file', () => {
+        const {dir} = repo(undefined)
+        const shared = fs.realpathSync(fs.mkdtempSync(path.join(path.dirname(dir), 'xcute-shared-')))
+        fs.writeFileSync(path.join(shared, 'xcute.yml'), 'entries:\n  where:\n    description: d\n    commands: [pwd]\n')
+        fs.symlinkSync(path.join(shared, 'xcute.yml'), path.join(dir, 'xcute.yml'))
+        try {
+            const loaded = loadCatalog(dir)
+            expect(loaded?.dir).to.equal(dir)
+            expect(loaded?.file).to.equal(path.join(shared, 'xcute.yml'))
+            expect(loaded?.name).to.equal(path.basename(dir))
+        } finally {
+            fs.rmSync(shared, {force: true, recursive: true})
+        }
+    })
+
     it('returns parse errors formatted with the file path', () => {
         const {dir} = repo('entries: [\n')
         const loaded = loadCatalog(dir)
