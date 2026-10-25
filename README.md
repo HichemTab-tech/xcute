@@ -124,7 +124,7 @@ If you don’t remember the exact name:
 xcute select # or xcute s
 ```
 
-You’ll get a numbered list and can pick one.
+You’ll get a list you can filter by typing, then pick one with Enter. Typing matches names and descriptions.
 
 #### Filtering actions
 
@@ -268,15 +268,15 @@ xcute list --no-table
 xcute list -f "preview fail"   # match words in names and descriptions
 ```
 
-Inside a repository with an `xcute.yml`, entries are grouped by topic, then `Other`, then `Your actions`. Guides are marked `(guide, N steps)` and show `N steps` in the commands column with `-c`, and a catalog entry hidden by one of your actions is marked `(your action wins)`.
+Inside a repository with an `xcute.yml`, `xcute select` opens with a header, then the catalog's topics, then `Your actions`. Pick a topic to see its entries (with a way back), or just type to search every entry and your own actions at once. Choosing a guide asks `Walk through it` or `Just read it`. In `xcute list`, entries are grouped by topic, then `Other`, then `Your actions`. Guides are marked `(guide, N steps)` and show `N steps` in the commands column with `-c`, and a catalog entry hidden by one of your actions is marked `(your action wins)`.
 
 ### `xcute select`
 
-Interactively select and run a action.
+Search, select and run an action. Type to filter by name or description. Inside a repository with an `xcute.yml`, topics come first and guides ask `Walk through it` / `Just read it`.
 
 ```bash
 xcute select
-xcute select react      # filter by name
+xcute select react      # start with "react" typed
 xcute s react           # same via alias
 xcute select -f react   # legacy filter flag
 ```
