@@ -1,6 +1,10 @@
 import {expect} from 'chai'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
-import {createShellExecutionPlan, resolveVariableValue} from '../../src/utils/runner.js'
+import {prompts} from '../../src/utils/prompts.js'
+import {createShellExecutionPlan, executeCommands, resolveVariable, resolveVariableValue} from '../../src/utils/runner.js'
 
 describe('runner', () => {
     it('uses the interactive user shell on unix-like systems', () => {
@@ -66,6 +70,52 @@ describe('runner', () => {
         expect(resolution).to.deep.equal({
             promptDefault: 'fallback',
             shouldPrompt: true,
+        })
+    })
+
+    describe('reuse helpers', () => {
+        let origInput: typeof prompts.input
+
+        beforeEach(() => {
+            origInput = prompts.input
+        })
+
+        afterEach(() => {
+            prompts.input = origInput
+        })
+
+        it('runs commands in the given cwd', async () => {
+            const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'xcute-cwd-'))
+            const ok = await executeCommands([`node -e "require('node:fs').writeFileSync('cwd.txt', process.cwd())"`], {cwd: dir, logError() {}})
+            expect(ok).to.equal(true)
+            expect(fs.readFileSync(path.join(dir, 'cwd.txt'), 'utf8')).to.equal(fs.realpathSync(dir))
+        })
+
+        it('returns false and reports the exit code when a command fails', async () => {
+            const errors: string[] = []
+            const ok = await executeCommands(['exit 3'], {logError: (m) => errors.push(m)})
+            expect(ok).to.equal(false)
+            expect(errors).to.deep.equal(['Command failed with exit code 3'])
+        })
+
+        it('resolveVariable returns the provided value without prompting', async () => {
+            prompts.input = (async () => {
+                throw new Error('should not prompt')
+            }) as typeof prompts.input
+            const value = await resolveVariable('name', {replacements: ['x']}, 'given', false)
+            expect(value).to.equal('given')
+        })
+
+        it('resolveVariable prompts with the default prefilled in interactive mode', async () => {
+            let received: {default?: string; message: string} | undefined
+            prompts.input = (async (options: {default?: string; message: string}) => {
+                received = options
+                return 'typed'
+            }) as typeof prompts.input
+            const value = await resolveVariable('name', {defaultValue: 'fallback', replacements: ['x']}, undefined, true)
+            expect(value).to.equal('typed')
+            expect(received?.default).to.equal('fallback')
+            expect(received?.message).to.equal('name:')
         })
     })
 })
