@@ -7,6 +7,7 @@ import * as path from 'node:path'
 import SyncPush from '../../src/commands/sync-push.js'
 import {saveConfig, setConfigDir} from '../../src/utils/config.js'
 import {loadSyncState, saveSyncState} from '../../src/utils/sync.js'
+import {createCatalogRepo} from '../helpers/catalog-repo.js'
 
 describe('sync-push', () => {
     let testDir: string
@@ -100,5 +101,18 @@ describe('sync-push', () => {
             ['commit', '-m', 'sync xcute registry'],
             ['push', '--set-upstream', 'origin', 'HEAD'],
         ])
+    })
+
+    it('never pushes catalog entries to the sync snapshot', async () => {
+        const repo = createCatalogRepo('version: 1\nentries:\n  lint:\n    description: Lint.\n    commands:\n      - pnpm lint\n')
+        try {
+            await runCommand(['sync-push', '--strategy', 'local'])
+        } finally {
+            repo.cleanup()
+        }
+
+        const remoteConfig = JSON.parse(fs.readFileSync(path.join(repoDir, 'xcute.json'), 'utf8'))
+        expect(Object.keys(remoteConfig)).to.deep.equal(['shared'])
+        expect(Object.keys(loadSyncState()!.lastSyncedConfig)).to.deep.equal(['shared'])
     })
 })
