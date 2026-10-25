@@ -1,6 +1,6 @@
 import {expect} from 'chai'
 
-import {prompts} from '../../src/utils/prompts.js'
+import {prompts, terminal} from '../../src/utils/prompts.js'
 
 describe('prompts', () => {
     let origConfirm: typeof prompts.confirm
@@ -56,5 +56,11 @@ describe('prompts', () => {
 
         const result = await prompts.select({choices: ['choice-1', 'choice-2'], message: 'pick-one'})
         expect(result).to.equal('choice-1')
+    })
+
+    it('exposes search and terminal.isInteractive', () => {
+        expect(prompts).to.have.property('search')
+        expect(terminal.isInteractive).to.be.a('function')
+        expect(terminal.isInteractive()).to.be.a('boolean')
     })
 })
