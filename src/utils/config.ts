@@ -37,6 +37,8 @@ export function setIncludePresets(include: boolean): void {
 export const getConfigDir = () => {
     if (customConfig.customDir) return customConfig.customDir
 
+    if (process.env.XCUTE_HOME) return path.resolve(process.env.XCUTE_HOME)
+
     if (process.env.NODE_ENV === 'development') {
         const __filename = fileURLToPath(import.meta.url)
         const __dirname = path.dirname(__filename)
