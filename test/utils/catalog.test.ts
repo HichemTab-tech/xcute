@@ -61,7 +61,7 @@ describe('catalog discovery', () => {
             expect(viaLink?.file).to.equal(path.join(dir, 'xcute.yml'))
             expect(viaLink?.file).to.equal(loadCatalog(dir)?.file)
         } finally {
-            fs.rmSync(link, {force: true})
+            fs.unlinkSync(link)
         }
     })
 

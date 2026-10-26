@@ -81,7 +81,7 @@ describe('config utilities', () => {
 
         it('uses XCUTE_HOME when no override is set', () => {
             process.env.XCUTE_HOME = '/tmp/xcute-home-test'
-            expect(getConfigDir()).to.equal('/tmp/xcute-home-test')
+            expect(getConfigDir()).to.equal(path.resolve('/tmp/xcute-home-test'))
         })
 
         it('resolves a relative XCUTE_HOME against the current directory', () => {
@@ -98,7 +98,7 @@ describe('config utilities', () => {
         it('lets XCUTE_HOME win over NODE_ENV=development', () => {
             process.env.NODE_ENV = 'development'
             process.env.XCUTE_HOME = '/tmp/xcute-home-test'
-            expect(getConfigDir()).to.equal('/tmp/xcute-home-test')
+            expect(getConfigDir()).to.equal(path.resolve('/tmp/xcute-home-test'))
         })
 
         it('keeps the setConfigDir override above XCUTE_HOME', () => {
